@@ -1,0 +1,760 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#f5f7fb">
+  <title>射的スコア計算機</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f5f7fb;
+      --surface: #ffffff;
+      --text: #182230;
+      --muted: #7b8797;
+      --line: #e8edf3;
+      --green: #16845b;
+      --green-bg: #eaf7f0;
+      --green-border: #ccebd9;
+      --red: #c64b52;
+      --red-bg: #fff0f0;
+      --red-border: #f4d4d5;
+      --shadow: 0 18px 55px rgba(28, 45, 70, .08);
+      --panel-start: #fbfcfe;
+      --panel-end: #f7f9fc;
+      --glow: rgba(220, 231, 248, .55);
+      --reset-bg: #ffffff;
+      --reset-hover: #f7f8fa;
+      --reset-text: #596579;
+      --card-border: rgba(226, 232, 240, .9);
+      --focus: #8db7f5;
+      --overlay: rgba(15, 23, 42, .48);
+      --dialog-shadow: 0 24px 80px rgba(0, 0, 0, .22);
+      --danger: #c64b52;
+      --danger-hover: #b83e46;
+      --neutral-hover: #f0f2f5;
+      transition: background-color .2s ease, color .2s ease;
+    }
+
+    :root[data-effective-theme="dark"] {
+      color-scheme: dark;
+      --bg: #10151d;
+      --surface: #1b222d;
+      --text: #f1f5f9;
+      --muted: #a4b0c0;
+      --line: #354051;
+      --green: #82dfaf;
+      --green-bg: #1a3a31;
+      --green-border: #356f57;
+      --red: #ff9ca2;
+      --red-bg: #462a32;
+      --red-border: #75434d;
+      --shadow: 0 18px 55px rgba(0, 0, 0, .28);
+      --panel-start: #232d3b;
+      --panel-end: #1c2633;
+      --glow: rgba(58, 76, 104, .35);
+      --reset-bg: #242e3b;
+      --reset-hover: #303c4b;
+      --reset-text: #d0d9e5;
+      --card-border: #354051;
+      --focus: #a8c8ff;
+      --overlay: rgba(0, 0, 0, .68);
+      --dialog-shadow: 0 24px 80px rgba(0, 0, 0, .48);
+      --danger: #ff858d;
+      --danger-hover: #ff9ca2;
+      --neutral-hover: #303c4b;
+    }
+
+    * { box-sizing: border-box; }
+
+    html {
+      min-height: 100%;
+      background: var(--bg);
+      -webkit-tap-highlight-color: transparent;
+      touch-action: manipulation;
+    }
+
+    body {
+      min-height: 100svh;
+      margin: 0;
+      padding: max(20px, env(safe-area-inset-top)) 18px max(20px, env(safe-area-inset-bottom));
+      display: grid;
+      place-items: center;
+      color: var(--text);
+      background:
+        radial-gradient(ellipse at 50% 0%, var(--glow), transparent 48%),
+        var(--bg);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans JP", sans-serif;
+    }
+
+    .app {
+      width: min(100%, 620px);
+      padding: clamp(22px, 5vw, 38px);
+      border: 1px solid var(--card-border);
+      border-radius: 28px;
+      background: var(--surface);
+      box-shadow: var(--shadow);
+    }
+
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 28px;
+    }
+
+    .brand {
+      margin: 0;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 750;
+      letter-spacing: .18em;
+    }
+
+    .theme-switch {
+      position: relative;
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      width: min(100%, 252px);
+      padding: 4px;
+      border: 1px solid var(--line);
+      border-radius: 13px;
+      background: var(--panel-end);
+      isolation: isolate;
+    }
+
+    .theme-indicator {
+      position: absolute;
+      z-index: -1;
+      top: 4px;
+      bottom: 4px;
+      left: 4px;
+      width: calc((100% - 8px) / 3);
+      border: 1px solid var(--line);
+      border-radius: 9px;
+      background: var(--surface);
+      box-shadow: 0 2px 7px rgba(0, 0, 0, .08);
+      transform: translateX(calc(var(--theme-index, 2) * 100%));
+      transition: transform .23s ease, background-color .2s ease;
+    }
+
+    .theme-option {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+      min-height: 36px;
+      padding: 5px 3px;
+      border: 0;
+      border-radius: 9px;
+      background: transparent;
+      color: var(--muted);
+      font: inherit;
+      font-size: 11px;
+      font-weight: 700;
+      white-space: nowrap;
+      cursor: pointer;
+      touch-action: manipulation;
+    }
+
+    .theme-option[aria-pressed="true"] { color: var(--text); }
+    .theme-option:focus-visible { outline: 3px solid var(--focus); outline-offset: -2px; }
+    .theme-option svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+
+    .score-panel {
+      padding: clamp(24px, 5vw, 34px) 16px;
+      margin-bottom: 28px;
+      border: 1px solid var(--line);
+      border-radius: 22px;
+      background: linear-gradient(145deg, var(--panel-start), var(--panel-end));
+      text-align: center;
+    }
+
+    .score-label {
+      margin: 0 0 10px;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 750;
+      letter-spacing: .22em;
+    }
+
+    .score {
+      display: block;
+      max-width: 100%;
+      overflow-wrap: anywhere;
+      color: var(--text);
+      font-size: clamp(54px, 12vw, 88px);
+      font-weight: 760;
+      font-variant-numeric: tabular-nums;
+      letter-spacing: -.065em;
+      line-height: 1.08;
+      transition: color .18s ease;
+    }
+
+    .score.bump {
+      animation: score-bump .22s ease-out;
+    }
+
+    @keyframes score-bump {
+      0% { transform: scale(1); }
+      45% { transform: scale(1.035); }
+      100% { transform: scale(1); }
+    }
+
+    .controls-heading {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin: 0 2px 13px;
+    }
+
+    .controls-heading h2 {
+      margin: 0;
+      font-size: 13px;
+      font-weight: 750;
+    }
+
+    .controls-heading span {
+      color: var(--muted);
+      font-size: 11px;
+    }
+
+    .target-list {
+      display: grid;
+      gap: 10px;
+    }
+
+    .target-row {
+      display: grid;
+      grid-template-columns: minmax(62px, 1fr) minmax(0, 226px);
+      align-items: center;
+      gap: 12px;
+      min-width: 0;
+      padding: 11px 14px;
+      border: 1px solid var(--line);
+      border-radius: 15px;
+      background: var(--panel-start);
+    }
+
+    .target-label {
+      min-width: 0;
+      color: var(--text);
+      font-size: 16px;
+      font-weight: 750;
+      font-variant-numeric: tabular-nums;
+      white-space: nowrap;
+    }
+
+    .target-controls {
+      display: grid;
+      grid-template-columns: 46px minmax(0, 1fr) 46px;
+      gap: 8px;
+      align-items: center;
+      min-width: 0;
+    }
+
+    .count-button {
+      display: grid;
+      place-items: center;
+      width: 46px;
+      min-height: 46px;
+      padding: 0;
+      border: 1px solid transparent;
+      border-radius: 12px;
+      font: inherit;
+      font-size: 24px;
+      font-weight: 650;
+      line-height: 1;
+      cursor: pointer;
+      user-select: none;
+      touch-action: manipulation;
+      transition: transform .12s ease, background .12s ease, box-shadow .12s ease;
+    }
+
+    .count-button.plus {
+      color: var(--green);
+      border-color: var(--green-border);
+      background: var(--green-bg);
+    }
+
+    .count-button.minus {
+      color: var(--red);
+      border-color: var(--red-border);
+      background: var(--red-bg);
+    }
+
+    .count-button:hover { filter: brightness(.985); }
+    .count-button:active { transform: scale(.96); box-shadow: inset 0 2px 5px rgba(20, 30, 45, .07); }
+
+    .count-input {
+      width: 100%;
+      min-width: 0;
+      min-height: 46px;
+      padding: 8px 6px;
+      border: 1px solid var(--line);
+      border-radius: 11px;
+      color: var(--text);
+      background: var(--surface);
+      font: inherit;
+      font-size: 17px;
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+      text-align: center;
+      outline: none;
+      transition: border-color .15s ease, box-shadow .15s ease, background-color .2s ease;
+    }
+
+    .count-input:focus-visible {
+      border-color: var(--focus);
+      box-shadow: 0 0 0 3px var(--focus);
+    }
+
+    .count-button:focus-visible,
+    .reset-button:focus-visible,
+    .modal button:focus-visible,
+    .modal:focus-visible {
+      outline: 3px solid var(--focus);
+      outline-offset: 3px;
+    }
+
+    .footer {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 12px;
+      margin-top: 22px;
+      padding-top: 18px;
+      border-top: 1px solid var(--line);
+    }
+
+    .footer-actions { display: flex; align-items: center; gap: 9px; }
+
+    .reset-button {
+      flex: 0 0 auto;
+      min-height: 42px;
+      padding: 9px 15px;
+      border: 1px solid var(--line);
+      border-radius: 11px;
+      color: var(--reset-text);
+      background: var(--reset-bg);
+      font: inherit;
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+      touch-action: manipulation;
+      transition: background .12s ease, transform .12s ease;
+    }
+
+    .reset-button:hover { background: var(--reset-hover); }
+    .reset-button:active { transform: scale(.97); }
+
+    .modal-overlay {
+      position: fixed;
+      z-index: 20;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      padding: max(18px, env(safe-area-inset-top)) 16px max(18px, env(safe-area-inset-bottom));
+      background: var(--overlay);
+      opacity: 0;
+      visibility: hidden;
+      transition: opacity .18s ease, visibility .18s ease;
+    }
+
+    .modal-overlay.is-open { opacity: 1; visibility: visible; }
+
+    .modal {
+      width: min(100%, 420px);
+      max-height: min(90svh, 620px);
+      overflow-y: auto;
+      padding: 25px;
+      border: 1px solid var(--card-border);
+      border-radius: 20px;
+      color: var(--text);
+      background: var(--surface);
+      box-shadow: var(--dialog-shadow);
+      opacity: 0;
+      transform: translateY(12px) scale(.97);
+      transition: opacity .18s ease, transform .18s cubic-bezier(.2,.75,.25,1);
+    }
+
+    .modal-overlay.is-open .modal { opacity: 1; transform: translateY(0) scale(1); }
+    .modal h2 { margin: 0 0 10px; font-size: 19px; font-weight: 750; }
+    .modal p { margin: 0; color: var(--muted); font-size: 14px; line-height: 1.75; }
+    .modal-actions { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 9px; margin-top: 23px; }
+    .modal-actions button {
+      min-height: 43px; padding: 10px 16px; border: 1px solid var(--line); border-radius: 11px;
+      color: var(--reset-text); background: var(--reset-bg); font: inherit; font-size: 13px; font-weight: 700; cursor: pointer;
+    }
+    .modal-actions button:hover { background: var(--neutral-hover); }
+    .modal-actions .danger { border-color: transparent; color: #fff; background: var(--danger); }
+    .modal-actions .danger:hover { background: var(--danger-hover); }
+
+    @media (max-width: 420px) {
+      .modal { padding: 22px 19px; border-radius: 18px; }
+      .modal-actions button { flex: 1 1 auto; }
+      .footer-actions { gap: 7px; }
+      .reset-button { padding: 9px 12px; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .modal-overlay, .modal { transition: none !important; }
+    }
+
+    @media (max-width: 420px) {
+      body { padding-right: 12px; padding-left: 12px; }
+      .app { padding: 21px 17px; border-radius: 23px; }
+      .header { margin-bottom: 20px; }
+      .header { flex-wrap: wrap; }
+      .theme-switch { width: 225px; margin-left: auto; }
+      .theme-option { font-size: 10px; gap: 3px; }
+      .theme-option svg { width: 12px; height: 12px; }
+      .score-panel { margin-bottom: 22px; }
+      .target-list { gap: 8px; }
+      .target-row { padding: 9px 10px; gap: 7px; }
+      .target-label { font-size: 14px; }
+      .target-controls { grid-template-columns: 42px minmax(0, 1fr) 42px; gap: 6px; }
+      .count-button { width: 42px; min-height: 46px; }
+      .count-input { min-height: 46px; font-size: 16px; }
+    }
+
+    @media (max-height: 720px) and (min-width: 421px) {
+      body { padding-top: 12px; padding-bottom: 12px; }
+      .app { padding-top: 22px; padding-bottom: 22px; }
+      .header { margin-bottom: 16px; }
+      .score-panel { padding-top: 18px; padding-bottom: 18px; margin-bottom: 18px; }
+      .target-list { gap: 7px; }
+      .target-row { padding-top: 7px; padding-bottom: 7px; }
+      .footer { margin-top: 15px; padding-top: 13px; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        scroll-behavior: auto !important;
+        animation-duration: .01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: .01ms !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="app" aria-label="射的ゲームのスコア計算機">
+    <header class="header">
+      <p class="brand">射的スコア計算機</p>
+      <div class="theme-switch" role="group" aria-label="表示テーマ">
+        <span class="theme-indicator" aria-hidden="true"></span>
+        <button class="theme-option" type="button" data-theme="dark" aria-pressed="false">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.5 14.2A8.5 8.5 0 0 1 9.8 3.5 8.5 8.5 0 1 0 20.5 14.2Z"/></svg>ダーク
+        </button>
+        <button class="theme-option" type="button" data-theme="light" aria-pressed="false">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M4.93 4.93l1.42 1.42m11.3 11.3 1.42 1.42M2 12h2m16 0h2M4.93 19.07l1.42-1.42m11.3-11.3 1.42-1.42"/></svg>ホワイト
+        </button>
+        <button class="theme-option" type="button" data-theme="auto" aria-pressed="true">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M8 22h8m-4-4v4"/></svg>自動
+        </button>
+      </div>
+    </header>
+
+    <section class="score-panel" aria-labelledby="score-label">
+      <p class="score-label" id="score-label">合計得点</p>
+      <output class="score" id="score" aria-live="polite" aria-atomic="true">0</output>
+    </section>
+
+    <section aria-labelledby="controls-title">
+      <div class="controls-heading">
+        <h2 id="controls-title">倒れた的の個数</h2>
+        <span>的の種類ごとに入力</span>
+      </div>
+
+      <div class="target-list">
+        <div class="target-row" data-point="300">
+          <label class="target-label" for="count-300">300点の的</label>
+          <div class="target-controls">
+            <button class="count-button minus" type="button" data-change="-1" data-point="300" aria-label="300点の的を1個減らす">−</button>
+            <input class="count-input" id="count-300" data-point="300" type="text" inputmode="numeric" pattern="[0-9]*" autocomplete="off" spellcheck="false" value="0" aria-label="300点の的の個数">
+            <button class="count-button plus" type="button" data-change="1" data-point="300" aria-label="300点の的を1個増やす">＋</button>
+          </div>
+        </div>
+        <div class="target-row" data-point="100">
+          <label class="target-label" for="count-100">100点の的</label>
+          <div class="target-controls">
+            <button class="count-button minus" type="button" data-change="-1" data-point="100" aria-label="100点の的を1個減らす">−</button>
+            <input class="count-input" id="count-100" data-point="100" type="text" inputmode="numeric" pattern="[0-9]*" autocomplete="off" spellcheck="false" value="0" aria-label="100点の的の個数">
+            <button class="count-button plus" type="button" data-change="1" data-point="100" aria-label="100点の的を1個増やす">＋</button>
+          </div>
+        </div>
+        <div class="target-row" data-point="50">
+          <label class="target-label" for="count-50">50点の的</label>
+          <div class="target-controls">
+            <button class="count-button minus" type="button" data-change="-1" data-point="50" aria-label="50点の的を1個減らす">−</button>
+            <input class="count-input" id="count-50" data-point="50" type="text" inputmode="numeric" pattern="[0-9]*" autocomplete="off" spellcheck="false" value="0" aria-label="50点の的の個数">
+            <button class="count-button plus" type="button" data-change="1" data-point="50" aria-label="50点の的を1個増やす">＋</button>
+          </div>
+        </div>
+        <div class="target-row" data-point="30">
+          <label class="target-label" for="count-30">30点の的</label>
+          <div class="target-controls">
+            <button class="count-button minus" type="button" data-change="-1" data-point="30" aria-label="30点の的を1個減らす">−</button>
+            <input class="count-input" id="count-30" data-point="30" type="text" inputmode="numeric" pattern="[0-9]*" autocomplete="off" spellcheck="false" value="0" aria-label="30点の的の個数">
+            <button class="count-button plus" type="button" data-change="1" data-point="30" aria-label="30点の的を1個増やす">＋</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <footer class="footer">
+      <div class="footer-actions">
+        <button class="reset-button" id="reset-button" type="button">リセット</button>
+      </div>
+    </footer>
+  </main>
+
+  <div class="modal-overlay" id="modal-overlay" aria-hidden="true">
+    <section class="modal" id="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title" aria-describedby="modal-description" tabindex="-1">
+      <h2 id="modal-title"></h2>
+      <p id="modal-description"></p>
+      <div class="modal-actions" id="modal-actions"></div>
+    </section>
+  </div>
+
+  <script>
+    (() => {
+      "use strict";
+
+      const COUNTS_KEY = "shooting-scoreboard-counts-v1";
+      const THEME_KEY = "simple-scoreboard-theme";
+      try { localStorage.removeItem("simple-scoreboard-student-number"); } catch (error) { /* Storage may be unavailable. */ }
+      const themeOptions = document.querySelectorAll(".theme-option");
+      const themeSwitch = document.querySelector(".theme-switch");
+      const systemDark = window.matchMedia("(prefers-color-scheme: dark)");
+      const themeIndices = { dark: 0, light: 1, auto: 2 };
+      let selectedTheme = "auto";
+
+      function applyTheme() {
+        const effective = selectedTheme === "auto" ? (systemDark.matches ? "dark" : "light") : selectedTheme;
+        document.documentElement.dataset.effectiveTheme = effective;
+        themeSwitch.style.setProperty("--theme-index", themeIndices[selectedTheme]);
+        themeOptions.forEach(button => button.setAttribute("aria-pressed", String(button.dataset.theme === selectedTheme)));
+        document.querySelector('meta[name="theme-color"]').content = effective === "dark" ? "#10151d" : "#f5f7fb";
+      }
+
+      try {
+        const savedTheme = localStorage.getItem(THEME_KEY);
+        if (Object.hasOwn(themeIndices, savedTheme)) selectedTheme = savedTheme;
+      } catch (error) { /* Theme remains usable without persistent storage. */ }
+
+      themeOptions.forEach(button => button.addEventListener("click", () => {
+        selectedTheme = button.dataset.theme;
+        applyTheme();
+        try { localStorage.setItem(THEME_KEY, selectedTheme); } catch (error) { /* Ignore unavailable storage. */ }
+      }));
+      systemDark.addEventListener("change", () => { if (selectedTheme === "auto") applyTheme(); });
+      applyTheme();
+
+      const scoreElement = document.getElementById("score");
+      const resetButton = document.getElementById("reset-button");
+      const targetList = document.querySelector(".target-list");
+      const pointValues = [300, 100, 50, 30];
+      const counts = Object.fromEntries(pointValues.map(point => [point, 0n]));
+      const countInputs = new Map(pointValues.map(point => [point, document.getElementById(`count-${point}`)]));
+      const overlay = document.getElementById("modal-overlay");
+      const modal = document.getElementById("modal");
+      const modalTitle = document.getElementById("modal-title");
+      const modalDescription = document.getElementById("modal-description");
+      const modalActions = document.getElementById("modal-actions");
+
+      let modalState = null;
+      let previousFocus = null;
+
+      function formatScore(value) { return new Intl.NumberFormat("ja-JP").format(value); }
+
+      function calculateTotal() {
+        return pointValues.reduce((total, point) => total + counts[point] * BigInt(point), 0n);
+      }
+
+      function renderScore(animate = false) {
+        scoreElement.textContent = formatScore(calculateTotal());
+        if (animate) {
+          scoreElement.classList.remove("bump");
+          void scoreElement.offsetWidth;
+          scoreElement.classList.add("bump");
+        }
+      }
+
+      function syncCountInput(point) {
+        const input = countInputs.get(point);
+        input.value = counts[point].toString();
+        input.dataset.validValue = input.value;
+      }
+
+      function saveCounts() {
+        const payload = Object.fromEntries(pointValues.map(point => [point, counts[point].toString()]));
+        try {
+          localStorage.setItem(COUNTS_KEY, JSON.stringify(payload));
+        } catch (error) { /* Continue working even if localStorage is unavailable. */ }
+      }
+
+      function loadCounts() {
+        try {
+          const stored = localStorage.getItem(COUNTS_KEY);
+          if (stored === null) return; // Never infer target counts from the old total score.
+          const parsed = JSON.parse(stored);
+          const validObject = parsed !== null && typeof parsed === "object" && !Array.isArray(parsed);
+          let needsRepair = !validObject;
+          pointValues.forEach(point => {
+            const value = validObject ? parsed[point] : undefined;
+            if (typeof value === "string" && /^[0-9]+$/.test(value)) {
+              try {
+                counts[point] = BigInt(value);
+                if (value !== counts[point].toString()) needsRepair = true;
+              } catch (error) {
+                counts[point] = 0n;
+                needsRepair = true;
+              }
+            } else {
+              counts[point] = 0n;
+              needsRepair = true;
+            }
+          });
+          if (needsRepair) saveCounts();
+        } catch (error) {
+          pointValues.forEach(point => { counts[point] = 0n; });
+          saveCounts();
+        }
+      }
+
+      function setCount(point, nextCount, updateInput = true) {
+        if (nextCount < 0n) nextCount = 0n;
+        const changed = counts[point] !== nextCount;
+        counts[point] = nextCount;
+        if (updateInput) syncCountInput(point);
+        if (changed) {
+          renderScore(true);
+          saveCounts();
+        }
+      }
+
+      // Reject non-digit text rather than turning e.g. "1.5" into "15".
+      targetList.addEventListener("input", event => {
+        const input = event.target.closest("input.count-input");
+        if (!input || !targetList.contains(input)) return;
+        const text = input.value;
+        if (text !== "" && !/^[0-9]+$/.test(text)) {
+          input.value = input.dataset.validValue || "";
+          return;
+        }
+        input.dataset.validValue = text;
+        const point = Number(input.dataset.point);
+        try {
+          setCount(point, text === "" ? 0n : BigInt(text), false);
+        } catch (error) {
+          syncCountInput(point);
+        }
+      });
+
+      // Empty fields are permitted while typing, but become zero on commit.
+      targetList.addEventListener("focusout", event => {
+        const input = event.target;
+        if (input.matches("input.count-input")) syncCountInput(Number(input.dataset.point));
+      });
+
+      targetList.addEventListener("keydown", event => {
+        if (event.target.matches("input.count-input") && event.key === "Enter") {
+          event.preventDefault();
+          event.target.blur();
+        }
+      });
+
+      function closeModal(restoreFocus = true) {
+        if (!modalState) return;
+        const focusTarget = previousFocus;
+        modalState = null;
+        overlay.classList.remove("is-open");
+        overlay.setAttribute("aria-hidden", "true");
+        document.body.style.overflow = "";
+        if (restoreFocus && focusTarget && focusTarget.isConnected) focusTarget.focus();
+      }
+
+      function showModal(state, { title, description, actions }) {
+        modalState = state;
+        modalTitle.textContent = title;
+        modalDescription.textContent = description;
+        modalActions.replaceChildren();
+        actions.forEach(action => {
+          const button = document.createElement("button");
+          button.type = "button";
+          button.textContent = action.label;
+          if (action.className) button.className = action.className;
+          button.addEventListener("click", action.onClick);
+          modalActions.append(button);
+        });
+        if (!overlay.classList.contains("is-open")) previousFocus = document.activeElement;
+        overlay.setAttribute("aria-hidden", "false");
+        overlay.classList.add("is-open");
+        document.body.style.overflow = "hidden";
+        requestAnimationFrame(() => {
+          (modalActions.querySelector("button") || modal).focus();
+        });
+      }
+
+      function openResetConfirmation() {
+        showModal("reset", {
+          title: "スコアのリセット",
+          description: "すべての的の個数と合計得点をリセットします。この操作は取り消せません。",
+          actions: [
+            { label: "キャンセル", onClick: () => closeModal() },
+            { label: "リセットする", className: "danger", onClick: () => {
+              pointValues.forEach(point => {
+                counts[point] = 0n;
+                syncCountInput(point);
+              });
+              renderScore(true);
+              saveCounts();
+              closeModal();
+            }}
+          ]
+        });
+      }
+
+      targetList.addEventListener("click", event => {
+        const button = event.target.closest("button[data-change]");
+        if (!button || !targetList.contains(button)) return;
+        const point = Number(button.dataset.point);
+        const delta = BigInt(button.dataset.change);
+        setCount(point, counts[point] + delta);
+      });
+
+      resetButton.addEventListener("click", openResetConfirmation);
+
+      overlay.addEventListener("click", event => {
+        if (event.target === overlay) {
+          closeModal();
+        }
+      });
+
+      document.addEventListener("keydown", event => {
+        if (!modalState) return;
+        if (event.key === "Escape") {
+          event.preventDefault();
+          closeModal();
+          return;
+        }
+        if (event.key === "Tab") {
+          const focusable = [...modal.querySelectorAll('button, input, [tabindex]:not([tabindex="-1"])')].filter(el => !el.disabled);
+          if (!focusable.length) { event.preventDefault(); modal.focus(); return; }
+          const first = focusable[0], last = focusable[focusable.length - 1];
+          if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+          else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+        }
+      });
+
+      loadCounts();
+      pointValues.forEach(syncCountInput);
+      renderScore();
+    })();
+  </script>
+</body>
+</html>
